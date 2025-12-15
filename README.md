@@ -12,3 +12,5 @@ An OpenAction ([OpenDeck](https://github.com/nekename/OpenDeck)) plugin for cont
 - Next
 - Repeat
 - Shuffle
+- Seek Backwards
+- Seek Forwards
