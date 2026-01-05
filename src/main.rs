@@ -92,6 +92,37 @@ async fn seek(offset_microseconds: i64) -> Result<()> {
 	Ok(())
 }
 
+async fn change_volume(instance: &Instance, delta: f64) -> Result<()> {
+	let proxy = get_mpris_proxy().await?;
+
+	match proxy.get_property::<f64>("Volume").await {
+		Err(zbus::Error::FDO(ref e)) if matches!(e.as_ref(), zbus::fdo::Error::NotSupported(_)) => {
+			log::warn!(
+				"Volume control not supported by the current MPRIS player: {}",
+				e
+			);
+			let _ = instance.show_alert().await;
+			return Ok(());
+		}
+		Err(e) => {
+			log::warn!("Failed to get volume via MPRIS: {}", e);
+			let _ = instance.show_alert().await;
+			return Err(e.into());
+		}
+		Ok(current) => {
+			let new = (current + delta).clamp(0.0, 1.0);
+
+			if let Err(e) = proxy.set_property("Volume", &new).await {
+				log::warn!("Failed to set volume via MPRIS: {}", e);
+				let _ = instance.show_alert().await;
+				return Err(e.into());
+			}
+		}
+	}
+
+	Ok(())
+}
+
 async fn get_album_art(metadata: Option<&Value<'_>>) -> Option<String> {
 	fetch_and_convert_to_data_url(
 		&metadata?
@@ -324,6 +355,8 @@ async fn main() -> OpenActionResult<()> {
 	register_action(ShuffleAction {}).await;
 	register_action(SeekBackwardsAction {}).await;
 	register_action(SeekForwardsAction {}).await;
+	register_action(VolumeUpAction {}).await;
+	register_action(VolumeDownAction {}).await;
 
 	tokio::spawn(watch_album_art());
 
